@@ -15,4 +15,8 @@ typedef struct{
 }kv_record ;
 
 
+uint8_t *kv_record_serialize(const kv_record *rec , size_t *out_len);
+
+
+
 #endif
