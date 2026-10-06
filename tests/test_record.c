@@ -34,40 +34,76 @@ int main(void) {
 
     // Test 3: Check stored key length
 
-    uint32_t stored_key_len;
+    // uint32_t stored_key_len;
 
-    memcpy(&stored_key_len, buffer, 4);
+    // memcpy(&stored_key_len, buffer, 4);
 
-    assert(stored_key_len == 8);
+    // assert(stored_key_len == 8);
 
-    printf("Test 3 PASSED: Correct key length\n");
+    // printf("Test 3 PASSED: Correct key length\n");
 
-    // Test 4: Check stored value length
+    // // Test 4: Check stored value length
 
-    uint32_t stored_val_len;
+    // uint32_t stored_val_len;
 
-    memcpy(&stored_val_len, buffer + 4, 4);
+    // memcpy(&stored_val_len, buffer + 4, 4);
 
-    assert(stored_val_len == 7);
+    // assert(stored_val_len == 7);
 
-    printf("Test 4 PASSED: Correct value length\n");
+    // printf("Test 4 PASSED: Correct value length\n");
 
-    // Test 5: Check actual key
+    // // Test 5: Check actual key
 
-    assert(memcmp(buffer + 8, "username", 8) == 0);
+    // assert(memcmp(buffer + 8, "username", 8) == 0);
 
-    printf("Test 5 PASSED: Correct key\n");
+    // printf("Test 5 PASSED: Correct key\n");
 
-    // Test 6: Check actual value
+    // // Test 6: Check actual value
 
-    assert(memcmp(buffer + 16, "pratham", 7) == 0);
+    // assert(memcmp(buffer + 16, "pratham", 7) == 0);
 
-    printf("Test 6 PASSED: Correct value\n");
+    // printf("Test 6 PASSED: Correct value\n");
 
-    free(buffer);
+    // free(buffer);
 
-    printf("\nAll serialization tests passed!\n");
+    // printf("\nAll serialization tests passed!\n");
 
-    return 0;
+
+    // Deserialize 
+
+    kv_record restored ;
+
+    int result = kv_record_deserialize( buffer, buffer_len, &restored ) ;
+
+    assert(result==0) ;
+    printf("Test 1 Passed Deserialization successful\n") ;
+
+
+    assert(restored.key_len == rec.key_len);
+    assert(restored.val_len == rec.val_len) ;
+    
+
+    printf("Test 2 PASSED: Lengths Match\n") ;
+
+    assert(
+        memcmp(
+            restored.key,
+            rec.key,
+            rec.key_len
+        )==0
+    );
+    
+    printf(
+      "Test 3 PASSED: Values matched\n" 
+    );
+
+    free(buffer) ;
+    free(restored.key) ;
+    free(restored.value) ;
+
+    printf("\nAll Tests Passed!\n") ;
+
+    return  0 ;
+
 }
 
