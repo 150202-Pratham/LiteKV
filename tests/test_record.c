@@ -5,105 +5,228 @@
 #include <string.h>
 #include <assert.h>
 
+
 int main(void) {
 
-    kv_record rec;
+    /*
+     * ========================================
+     * ORIGINAL RECORD
+     * ========================================
+     */
 
-    rec.key = (uint8_t *)"username";
-    rec.key_len = 8;
+    kv_record original;
 
-    rec.value = (uint8_t *)"pratham";
-    rec.val_len = 7;
+    original.key =
+        (uint8_t *)"username";
+
+    original.key_len = 8;
+
+    original.value =
+        (uint8_t *)"pratham";
+
+    original.val_len = 7;
+
+
+    /*
+     * ========================================
+     * TEST 1
+     * Serialization
+     * ========================================
+     */
 
     size_t buffer_len = 0;
 
     uint8_t *buffer =
-        kv_record_serialize(&rec, &buffer_len);
-
-    // Test 1: Check memory allocation
+        kv_record_serialize(
+            &original,
+            &buffer_len
+        );
 
     assert(buffer != NULL);
 
-    printf("Test 1 PASSED: Buffer allocated\n");
-
-    // Test 2: Check serialized size
-
-    assert(buffer_len == 23);
-
-    printf("Test 2 PASSED: Correct buffer size\n");
-
-    // Test 3: Check stored key length
-
-    // uint32_t stored_key_len;
-
-    // memcpy(&stored_key_len, buffer, 4);
-
-    // assert(stored_key_len == 8);
-
-    // printf("Test 3 PASSED: Correct key length\n");
-
-    // // Test 4: Check stored value length
-
-    // uint32_t stored_val_len;
-
-    // memcpy(&stored_val_len, buffer + 4, 4);
-
-    // assert(stored_val_len == 7);
-
-    // printf("Test 4 PASSED: Correct value length\n");
-
-    // // Test 5: Check actual key
-
-    // assert(memcmp(buffer + 8, "username", 8) == 0);
-
-    // printf("Test 5 PASSED: Correct key\n");
-
-    // // Test 6: Check actual value
-
-    // assert(memcmp(buffer + 16, "pratham", 7) == 0);
-
-    // printf("Test 6 PASSED: Correct value\n");
-
-    // free(buffer);
-
-    // printf("\nAll serialization tests passed!\n");
+    printf(
+        "Test 1 PASSED: Serialization successful\n"
+    );
 
 
-    // Deserialize 
+    /*
+     * ========================================
+     * TEST 2
+     * Check serialized size
+     *
+     * 4 key_len
+     * 4 val_len
+     * 8 key
+     * 7 value
+     * 4 CRC
+     *
+     * Total = 27
+     * ========================================
+     */
 
-    kv_record restored ;
+    assert(buffer_len == 27);
 
-    int result = kv_record_deserialize( buffer, buffer_len, &restored ) ;
+    printf(
+        "Test 2 PASSED: Correct serialized size\n"
+    );
 
-    assert(result==0) ;
-    printf("Test 1 Passed Deserialization successful\n") ;
+
+    /*
+     * ========================================
+     * TEST 3
+     * Deserialization
+     * ========================================
+     */
+
+    kv_record restored;
+
+    int result =
+        kv_record_deserialize(
+            buffer,
+            buffer_len,
+            &restored
+        );
+
+    assert(result == 0);
+
+    printf(
+        "Test 3 PASSED: Deserialization successful\n"
+    );
 
 
-    assert(restored.key_len == rec.key_len);
-    assert(restored.val_len == rec.val_len) ;
-    
+    /*
+     * ========================================
+     * TEST 4
+     * Check lengths
+     * ========================================
+     */
 
-    printf("Test 2 PASSED: Lengths Match\n") ;
+    assert(
+        restored.key_len ==
+        original.key_len
+    );
+
+    assert(
+        restored.val_len ==
+        original.val_len
+    );
+
+    printf(
+        "Test 4 PASSED: Lengths match\n"
+    );
+
+
+    /*
+     * ========================================
+     * TEST 5
+     * Check key
+     * ========================================
+     */
 
     assert(
         memcmp(
             restored.key,
-            rec.key,
-            rec.key_len
-        )==0
+            original.key,
+            original.key_len
+        ) == 0
     );
-    
+
     printf(
-      "Test 3 PASSED: Values matched\n" 
+        "Test 5 PASSED: Key matches\n"
     );
 
-    free(buffer) ;
-    free(restored.key) ;
-    free(restored.value) ;
 
-    printf("\nAll Tests Passed!\n") ;
+    /*
+     * ========================================
+     * TEST 6
+     * Check value
+     * ========================================
+     */
 
-    return  0 ;
+    assert(
+        memcmp(
+            restored.value,
+            original.value,
+            original.val_len
+        ) == 0
+    );
 
+    printf(
+        "Test 6 PASSED: Value matches\n"
+    );
+
+
+    /*
+     * Free deserialized record.
+     */
+    free(restored.key);
+    free(restored.value);
+
+
+    /*
+     * ========================================
+     * TEST 7
+     * Corruption Detection
+     * ========================================
+     *
+     * Change one byte in the record.
+     */
+
+    buffer[10] ^= 0xFF;
+
+
+    kv_record corrupted;
+
+    int corruption_result =
+        kv_record_deserialize(
+            buffer,
+            buffer_len,
+            &corrupted
+        );
+
+
+    assert(corruption_result == -1);
+
+    printf(
+        "Test 7 PASSED: Corruption detected\n"
+    );
+
+
+    /*
+     * ========================================
+     * TEST 8
+     * Truncated Record
+     * ========================================
+     *
+     * Pretend the last 5 bytes
+     * were never written.
+     */
+
+    int truncated_result =
+        kv_record_deserialize(
+            buffer,
+            buffer_len - 5,
+            &corrupted
+        );
+
+
+    assert(truncated_result == -1);
+
+    printf(
+        "Test 8 PASSED: Truncated record detected\n"
+    );
+
+
+    /*
+     * Free serialized buffer.
+     */
+    free(buffer);
+
+
+    printf(
+        "\nAll tests passed!\n"
+    );
+
+
+    return 0;
 }
-
