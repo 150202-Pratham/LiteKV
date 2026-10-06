@@ -19,7 +19,7 @@ typedef struct{
 uint8_t *kv_record_serialize(const kv_record *rec , size_t *out_len);
 
 // Deserialization Function Declaration
-uint8_t *kv_record_deserialize(const uint8_t *buf , size_t buf_len , kv_record *out) ;
+int kv_record_deserialize(const uint8_t *buf , size_t buf_len , kv_record *out) ;
 
 
 
