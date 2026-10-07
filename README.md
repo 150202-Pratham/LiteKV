@@ -226,35 +226,39 @@ Closes the storage and releases allocated resources.
 
 ## 5. Design
 
-### 5.1 High-Level Architecture
-
-The planned architecture is:
+### Current Architecture
 
 ```text
                     Application
-                         |
-                         |
-                kv_put / kv_get
-                  /    kv_delete
-                         |
-                         v
-                 +---------------+
-                 |   litekv API  |
-                 +-------+-------+
-                         |
-                +--------+--------+
-                |                 |
-                v                 v
-        +---------------+   +---------------+
-        |  In-Memory    |   |      WAL      |
-        |  Hash Table   |   | Append-Only   |
-        |     Index     |   |      Log      |
-        +---------------+   +-------+-------+
-                                    |
-                                    v
-                                   Disk
-```
+                         │
+                         ▼
+                 LiteKV API Layer
+                 (planned)
+                         │
+             ┌───────────┴───────────┐
+             │                       │
+             ▼                       ▼
+      In-Memory Index               WAL
+         (planned)              🟢 Implemented
+             │                       │
+             │                 ┌─────┴─────┐
+             │                 │           │
+             │              write()      fsync()
+             │                 │           │
+             │                 └─────┬─────┘
+             │                       │
+             └───────────────┬───────┘
+                             ▼
+                         Disk Storage
 
+
+Current low-level record layer:
+
+kv_record
+    │
+    ├── Serialization      🟢
+    ├── Deserialization    🟢
+    └── CRC32              🟢
 The application interacts with litekv through its API.
 
 The library will use:
@@ -538,38 +542,427 @@ The project focuses specifically on:
 
 ## 8. Current Development Status
 
-The project is being developed incrementally.
+LiteKV is being implemented incrementally. Each low-level component is
+implemented and tested before the next component is developed.
 
-### Completed
+## 🟢 Completed
 
-* Project directory structure
-* Basic `kv_record` structure
-* Key and value length representation
-* Basic record test
-* Initial serialization implementation
+### 1. Project Structure
 
-### In Progress
+The initial project structure has been created:
 
-* Complete record serialization/deserialization
-* CRC32 checksum
-* WAL implementation
+```text
+LiteKV/
+├── include/
+│   ├── kv_record.h
+│   └── kv_wal.h
+│
+├── src/
+│   ├── kv_record.c
+│   └── kv_wal.c
+│
+├── tests/
+│   ├── test_record.c
+│   └── test_wal.c
+│
+├── Makefile
+└── README.md
 
-### Planned
+2. Key-Value Record Representation
 
-* In-memory hash table
-* `kv_put()`
-* `kv_get()`
-* `kv_delete()`
-* WAL replay
-* Crash recovery
-* Crash-injection testing
-* Log compaction
-* CLI demonstration
-* Benchmarks
-* Final documentation
-* Viva preparation
+Implemented the kv_record structure.
+
+A record contains:
+
+Key length
+Value length
+Key data
+Value data
+
+Keys and values are stored as byte arrays with explicit lengths.
+
+3. Record Serialization
+
+Implemented conversion of a kv_record into a binary representation.
+
+Current record format:
+
+┌──────────────┬──────────────┬───────────┬─────────────┬─────────┐
+│ key_len 4 B  │ val_len 4 B  │    key    │    value    │ CRC 4 B │
+└──────────────┴──────────────┴───────────┴─────────────┴─────────┘
+
+The serialized size is:
+
+4 + 4 + key_len + value_len + 4
+4. Record Deserialization
+
+Implemented conversion of serialized binary data back into a
+kv_record.
+
+The deserializer:
+
+Reads key length
+Reads value length
+Calculates the expected record size
+Checks whether the complete record is available
+Reads the stored CRC
+Calculates the CRC again
+Rejects corrupted records
+Allocates memory for key and value
+Restores the original key-value pair
+5. CRC32 Integrity Checking
+
+Implemented CRC32 checksum calculation.
+
+The CRC is calculated over:
+
+key_len + val_len + key + value
+
+The CRC itself is then stored at the end of the record.
+
+During deserialization:
+
+Stored CRC
+     │
+     ▼
+Compare with
+Calculated CRC
+     │
+     ├── Same ──────► Record accepted
+     │
+     └── Different ─► Record rejected
+6. Record Integrity Tests
+
+Tests have been implemented for:
+
+Serialization
+Correct serialized size
+Deserialization
+Matching key length
+Matching value length
+Matching key data
+Matching value data
+Corrupted record detection
+Truncated record detection
+
+All current record-layer tests pass.
+
+7. WAL File Creation
+
+Implemented the initial Write-Ahead Log module.
+
+The WAL supports:
+
+Opening a WAL file
+Creating the file if it does not exist
+Opening the file in write mode
+Opening the file in append mode
+Closing the file
+
+The implementation uses POSIX file operations including:
+
+open()
+close()
+8. WAL Append
+
+Implemented appending raw bytes to the WAL.
+
+The WAL is opened using:
+
+O_WRONLY
+O_CREAT
+O_APPEND
+
+O_APPEND ensures that new data is written at the end of the
+existing WAL instead of overwriting previous records.
+
+The implementation also verifies that the expected number of bytes
+were written.
+
+9. WAL Durability
+
+Added fsync() after a successful WAL write.
+
+The current write path is:
+
+Application
+     │
+     ▼
+   write()
+     │
+     ▼
+Operating System
+     │
+     ▼
+   fsync()
+     │
+     ▼
+Persistent Storage
+
+This establishes the basic durability mechanism required for the
+crash-safety goal of LiteKV.
+
+🔵 Remaining Work
+
+The following components are still under development.
+
+1. WAL Record Reading
+
+Implement reading serialized records from the WAL.
+
+The reader will:
+
+Read the record header
+Determine the record size
+Read the complete record
+Validate the CRC
+Detect incomplete records
+Deserialize the record
+2. WAL Replay
+
+Implement replaying the WAL when the database is opened.
+
+The process will be:
+
+Open WAL
+   │
+   ▼
+Read records sequentially
+   │
+   ▼
+Validate record
+   │
+   ▼
+Deserialize record
+   │
+   ▼
+Apply record to in-memory index
+
+This will allow LiteKV to reconstruct its state after a restart.
+
+3. In-Memory Hash Table
+
+Implement an in-memory hash table for fast key lookup.
+
+The index will conceptually map:
+
+Key → WAL record location
+
+Example:
+
+"name" → offset 0
+"age"  → offset 27
+"city" → offset 39
+
+This avoids scanning the complete WAL for every lookup.
+
+4. kv_open()
+
+Implement the main database opening function.
+
+Responsibilities:
+
+Open or create the WAL
+Read existing records
+Replay valid records
+Rebuild the in-memory index
+Prepare the database for operations
+5. kv_put()
+
+Implement insertion and updating of key-value pairs.
+
+Expected flow:
+
+kv_put()
+   │
+   ▼
+Create record
+   │
+   ▼
+Serialize
+   │
+   ▼
+Append to WAL
+   │
+   ▼
+fsync()
+   │
+   ▼
+Update hash table
+6. kv_get()
+
+Implement fast key lookup.
+
+Expected flow:
+
+kv_get(key)
+     │
+     ▼
+Hash table lookup
+     │
+     ▼
+Find latest WAL record
+     │
+     ▼
+Return value
+7. kv_delete()
+
+Implement deletion using tombstone records.
+
+Example:
+
+PUT    name = Pratham
+PUT    name = Rahul
+DELETE name
+
+Because the WAL is append-only, the old records are not immediately
+removed. The delete operation records that the key is no longer
+valid.
+
+8. Crash Recovery Testing
+
+Test recovery from:
+
+Incomplete writes
+Corrupted records
+Truncated WAL records
+Program termination during storage operations
+Restart and WAL replay
+9. Log Compaction
+
+Implement optional log compaction.
+
+Compaction will remove obsolete records and create a smaller WAL while
+preserving the current database state.
+
+10. CLI
+
+Create a simple command-line interface:
+
+litekv put <key> <value>
+litekv get <key>
+litekv delete <key>
+11. Benchmarking
+
+Add basic performance measurements for:
+
+put
+get
+delete
+WAL operations
+12. Final Testing and Documentation
+
+Complete:
+
+End-to-end tests
+Error handling tests
+Crash recovery tests
+README documentation
+Project demonstration
+Viva preparation
+
+## Development Progress
+
+| Component | Status |
+|---|---|
+| Project design | 🟢 Completed |
+| Project structure | 🟢 Completed |
+| `kv_record` | 🟢 Completed |
+| Serialization | 🟢 Completed |
+| Deserialization | 🟢 Completed |
+| CRC32 | 🟢 Completed |
+| Corruption detection | 🟢 Completed |
+| Truncated-record detection | 🟢 Completed |
+| WAL file creation | 🟢 Completed |
+| WAL append | 🟢 Completed |
+| `fsync()` durability | 🟢 Completed |
+| WAL record reading | 🔵 Pending |
+| WAL replay | 🔵 Pending |
+| In-memory hash table | 🔵 Pending |
+| `kv_open()` | 🔵 Pending |
+| `kv_put()` | 🔵 Pending |
+| `kv_get()` | 🔵 Pending |
+| `kv_delete()` | 🔵 Pending |
+| Tombstones | 🔵 Pending |
+| Crash recovery tests | 🔵 Pending |
+| Log compaction | 🔵 Pending |
+| CLI | 🔵 Pending |
+| Benchmarking | 🔵 Pending |
+| Final testing | 🔵 Pending |
+| Final documentation | 🔵 Pending |
 
 ---
+## Development Roadmap
+
+### Phase 1 — Record Layer 🟢
+
+- [x] Define key-value record structure
+- [x] Implement serialization
+- [x] Implement deserialization
+- [x] Implement CRC32
+- [x] Detect corrupted records
+- [x] Detect truncated records
+- [x] Add unit tests
+
+### Phase 2 — WAL Foundation 🟢
+
+- [x] Create WAL module
+- [x] Open/create WAL file
+- [x] Append data
+- [x] Use append-only file mode
+- [x] Verify successful writes
+- [x] Add `fsync()` durability
+
+### Phase 3 — WAL Recovery 🔵
+
+- [ ] Read WAL records
+- [ ] Detect incomplete records
+- [ ] Validate record CRC
+- [ ] Deserialize WAL records
+- [ ] Replay WAL
+- [ ] Recover database state
+
+### Phase 4 — In-Memory Index 🔵
+
+- [ ] Implement hash table
+- [ ] Implement hash function
+- [ ] Handle collisions
+- [ ] Insert key
+- [ ] Find key
+- [ ] Update key
+- [ ] Remove key
+
+### Phase 5 — Public KV API 🔵
+
+- [ ] Implement `kv_open()`
+- [ ] Implement `kv_close()`
+- [ ] Implement `kv_put()`
+- [ ] Implement `kv_get()`
+- [ ] Implement `kv_delete()`
+
+### Phase 6 — Crash Safety 🔵
+
+- [ ] Test partial writes
+- [ ] Test corrupted records
+- [ ] Test truncated WAL
+- [ ] Test restart recovery
+- [ ] Verify committed data survives restart
+
+### Phase 7 — Optimization 🔵
+
+- [ ] Implement log compaction
+- [ ] Remove obsolete records
+- [ ] Reduce WAL size
+- [ ] Add benchmarks
+
+### Phase 8 — Demonstration 🔵
+
+- [ ] Build CLI
+- [ ] Add end-to-end tests
+- [ ] Finalize documentation
+- [ ] Prepare project demonstration
+- [ ] Prepare viva questions
+
 
 ## 9. Expected Outcome
 
