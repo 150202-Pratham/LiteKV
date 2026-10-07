@@ -60,6 +60,20 @@ int kv_wal_append(int fd , const uint8_t *data , size_t len){
 
     }
 
+    /*
+      Makes Sure the Written data is 
+      flushed to presisitent storage
+      Important
+      -> fsync() asks the operating system to flush the file's modified
+      data and associated filesystem metadata as needed so that the
+      changes are committed to persistent storage according to the 
+      system's durability semantics.
+    */
+     
+    if(fsync(fd)== -1){
+        return -1 ;
+
+    }
     return 0 ;
 
 }
