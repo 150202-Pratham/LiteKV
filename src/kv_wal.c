@@ -5,6 +5,9 @@
 */
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+
 
 int kv_wal_open(const char *path){
 
@@ -77,6 +80,81 @@ int kv_wal_append(int fd , const uint8_t *data , size_t len){
     return 0 ;
 
 }
+
+int kv_wal_read(int fd,
+                uint8_t **data,
+                size_t *len) {
+
+    if (fd < 0 || data == NULL || len == NULL) {
+        return -1;
+    }
+
+    uint8_t header[8];
+
+    ssize_t n =
+        read(fd, header, 8);
+
+    if (n == 0) {
+        return 1;
+    }
+
+    if (n != 8) {
+        return -1;
+    }
+
+    uint32_t key_len;
+    uint32_t val_len;
+
+    memcpy(
+        &key_len,
+        header,
+        4
+    );
+
+    memcpy(
+        &val_len,
+        header + 4,
+        4
+    );
+
+    size_t body_len = 4 + 4 + key_len + val_len;
+
+    size_t total_len = body_len + 4;
+
+    uint8_t *buffer = malloc(total_len);
+
+    if (buffer == NULL) {
+        return -1;
+    }
+
+    memcpy(
+        buffer,
+        header,
+        8
+    );
+
+    size_t remaining =
+        total_len - 8;
+
+    uint8_t *p =
+        buffer + 8;
+
+    ssize_t bytes_read =
+        read(fd, p, remaining);
+
+    if (bytes_read != (ssize_t)remaining) {
+
+        free(buffer);
+
+        return -1;
+    }
+
+    *data = buffer;
+    *len = total_len;
+
+    return 0;
+}
+
 
 void kv_wal_close(int fd){
 

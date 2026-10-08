@@ -51,6 +51,6 @@ void kv_wal_close(int fd) ;
 int kv_wal_read(int fd,
                 uint8_t **data,
                 size_t *len
-            );
+);
 
 #endif
