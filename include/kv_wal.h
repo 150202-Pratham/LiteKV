@@ -40,4 +40,17 @@ int kv_wal_append(int fd , const uint8_t *data , size_t len) ;
 
 void kv_wal_close(int fd) ;
 
+/*
+ * Read one complete serialized record from the WAL.
+ *
+ * Returns:
+ *   0  on success
+ *   1  when end of WAL is reached
+ *  -1  on error or incomplete record
+ */
+int kv_wal_read(int fd,
+                uint8_t **data,
+                size_t *len
+            );
+
 #endif
