@@ -128,7 +128,7 @@ int kv_wal_read(int fd,
     }
 
     memcpy(
-        buffer,
+        buffer
         header,
         8
     );
