@@ -33,6 +33,7 @@ typedef struct{
 
 uint32_t kv_hash(const uint8_t *key , size_t key_len) ;
 
+// This Declaration is to put the value
 int kv_hash_put(
     kv_hash_table *table,
     const uint8_t *key,
@@ -40,5 +41,16 @@ int kv_hash_put(
     const uint8_t *value,
     uint32_t value_len
 );
+
+// This Declaration is too get the value 
+
+int kv_hash_get(
+    kv_hash_table *table,
+    const uint8_t *key,
+    uint32_t key_len,
+    uint8_t **value,
+    uint32_t *value_len
+);
+
 
 #endif 
