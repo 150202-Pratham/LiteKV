@@ -4,8 +4,15 @@
 #include <stdint.h>
 #include <stddef.h>
 
-typedef struct{
+typedef enum {
 
+	KV_OP_PUT = 1 ,
+	KV_OP_DELETE = 2
+
+}kv_operation;
+
+typedef struct{
+    kv_operation operation ;
 	uint32_t key_len ;
 	uint32_t val_len ;
 	uint8_t *key;

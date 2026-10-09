@@ -10,7 +10,7 @@ uint8_t *kv_record_serialize(const kv_record *rec , size_t *out_len){
     }
 
 
-	size_t body_len = 4 + 4 + rec->key_len + rec->val_len;
+	size_t body_len =  4 + 4 + 4 + rec->key_len + rec->val_len;
 
     size_t total_len = body_len + 4 ;
 
@@ -23,16 +23,21 @@ uint8_t *kv_record_serialize(const kv_record *rec , size_t *out_len){
 
 	uint8_t *p = buffer ;
 
-	memcpy(p, &rec->key_len,4) ;
+	memcpy(p, &rec->operation, 4) ;
 	p+=4 ;
 
-	memcpy(p, &rec->val_len,4);
+	memcpy(p, &rec->key_len, 4) ;
 	p+=4 ;
 
-    memcpy(p, rec->key, rec->key_len);
+	memcpy(p, &rec->val_len, 4);
+	p+=4 ;
+    
+	if(rec->key_len > 0 )
+    	memcpy(p, rec->key, rec->key_len);
     p += rec->key_len;
 
-    memcpy(p, rec->value, rec->val_len);
+	if(rec->val_len > 0 )
+    	memcpy(p, rec->value, rec->val_len);
 
 
 	uint32_t crc = kv_crc32(buffer, body_len);
@@ -57,14 +62,14 @@ int kv_record_deserialize(const uint8_t *buf , size_t buf_len , kv_record *out){
 
 	/*
 	we need at least:
-
+    operation = 4 
 	4 bytes key_len 
 	4 bytes val_len 
 	4 bytes crc
 	however, we first need 8 bytes to even know the record size
 	*/
 
-	if( buf_len < 8 ){
+	if( buf_len < 12 + 4  ){
 
 		return -1 ;
 	}
@@ -72,17 +77,26 @@ int kv_record_deserialize(const uint8_t *buf , size_t buf_len , kv_record *out){
 	/*
 		Read Key length and value length 
 	*/
+
+	uint32_t operation;
 	uint32_t key_len ;
 	uint32_t val_len ;
 
-	memcpy(&key_len , buf , 4) ;
-	memcpy(&val_len , buf+4 , 4) ;
+	memcpy(&operation , buf , 4) ;
+	memcpy(&key_len , buf+4 , 4) ;
+	memcpy(&val_len , buf+8 , 4) ;
 
+	if (operation != KV_OP_PUT &&
+        operation != KV_OP_DELETE) {
+
+        return -1;
+    }
+    
 	/*
 	  Calculate size of data
       before CRC.
 	*/
-	size_t body_len = 4+4+key_len+val_len ;
+	size_t body_len = 4+4+4+key_len+val_len ;
 
 
 	/*
@@ -132,10 +146,16 @@ int kv_record_deserialize(const uint8_t *buf , size_t buf_len , kv_record *out){
        Store lengths in output structure.
      */
 
+	// if(operation != KV_OP_PUT && operation != KV_OP_DELETE){
+	// 	return -1 ;
+
+	// }
+
+	out->operation=(kv_operation)operation ;
 	out->key_len = key_len ;
 	out->val_len = val_len ;
 
-	out->key = malloc(key_len) ;
+	out->key = malloc(key_len>0 ? key_len : 1 ) ;
 	out->value = malloc(val_len>0 ? val_len : 1 ) ;
 
 	if(out->key == NULL || out->value == NULL ){
@@ -160,7 +180,7 @@ int kv_record_deserialize(const uint8_t *buf , size_t buf_len , kv_record *out){
      * 4 bytes val_len
      */
     if (key_len > 0) {
-	 	memcpy(out->key , buf+8 , key_len) ;
+	 	memcpy(out->key , buf+12 , key_len) ;
 	}
 
 	/*
@@ -173,7 +193,7 @@ int kv_record_deserialize(const uint8_t *buf , size_t buf_len , kv_record *out){
      */
     if (val_len > 0) {
 
-		memcpy(out->value, buf+8+key_len , val_len) ;
+		memcpy(out->value, buf+12+key_len , val_len) ;
 	}
 	return 0 ;
 }
