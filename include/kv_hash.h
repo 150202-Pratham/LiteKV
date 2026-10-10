@@ -58,5 +58,6 @@ int kv_hash_delete(
     uint32_t key_len
 );
 
+void kv_hash_free(kv_hash_table *table) ;
 
 #endif 
