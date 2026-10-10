@@ -52,5 +52,11 @@ int kv_hash_get(
     uint32_t *value_len
 );
 
+int kv_hash_delete(
+    kv_hash_table *table,
+    const uint8_t *key,
+    uint32_t key_len
+);
+
 
 #endif 
