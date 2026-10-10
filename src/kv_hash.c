@@ -438,3 +438,98 @@ int kv_hash_get(
     return -1;
 }
 
+int kv_hash_delete(
+    kv_hash_table *table,
+    const uint8_t *key,
+    uint32_t key_len
+){
+
+    /*
+     * Validate input.
+     */
+    if (table == NULL ||
+        key == NULL ||
+        key_len == 0) {
+
+        return -1;
+    }
+
+
+    /*
+     * Calculate the bucket.
+     */
+    size_t index =
+        kv_hash(key, key_len) % KV_TABLE_SIZE;
+
+
+    /*
+     * Start at the first node.
+     */
+    kv_entry *current =
+        table->buckets[index];
+
+
+    /*
+     * Keep track of the previous node.
+     */
+    kv_entry *previous = NULL;
+
+
+    /*
+     * Search the linked list.
+     */
+    while (current != NULL) {
+
+        /*
+         * Check whether this is
+         * the key we want.
+         */
+        if (current->key_len == key_len &&
+            memcmp(current->key, key, key_len) == 0) {
+
+            /*
+             * If previous is NULL,
+             * current is the first node.
+             */
+            if (previous == NULL) {
+
+                table->buckets[index] =
+                    current->next;
+
+            } else {
+
+                /*
+                 * Skip the current node.
+                 */
+                previous->next =
+                    current->next;
+            }
+
+
+            /*
+             * Free memory belonging
+             * to the deleted entry.
+             */
+            free(current->key);
+            free(current->value);
+            free(current);
+
+
+            return 0;
+        }
+
+
+        /*
+         * Move both pointers forward.
+         */
+        previous = current;
+        current = current->next;
+    }
+
+
+    /*
+     * Key was not found.
+     */
+    return -1;
+}
+
