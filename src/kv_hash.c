@@ -533,3 +533,32 @@ int kv_hash_delete(
     return -1;
 }
 
+// this Function is Entirely used to release all its allocated memory
+
+void kv_hash_free(kv_hash_table *table) {
+
+    if (table == NULL) {
+        return;
+    }
+
+    for (size_t i = 0; i < KV_TABLE_SIZE; i++) {
+
+        kv_entry *current = table->buckets[i];
+
+        while (current != NULL) {
+
+            kv_entry *next = current->next;
+
+            free(current->key);
+            free(current->value);
+            free(current);
+
+            current = next;
+        }
+
+        table->buckets[i] = NULL;
+    }
+}
+
+
+
