@@ -2,7 +2,7 @@
 #include "kv_record.h"
 #include "kv_replay.h"
 #include "kv_wal.h"
-
+#include <sys/types.h>
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -67,7 +67,8 @@ int main(void) {
     /*
      * Replay all records into the hash table.
      */
-    assert(kv_replay(fd, &table) == 0);
+    off_t valid_end = 0;
+    assert(kv_replay(fd, &table, &valid_end) == 0);
 
     kv_wal_close(fd);
 

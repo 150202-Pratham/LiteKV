@@ -11,10 +11,9 @@
 
 int main(void) {
 
-    const char *path =
-        "tests/replay_test.wal";
+    const char *path = "tests/replay_test.wal";
 
-
+    assert(unlink(path) == 0 || access(path, F_OK) == -1);
     /*
      * Open WAL for writing.
      */
