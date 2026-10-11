@@ -156,3 +156,50 @@ int kv_get(kv_db *db,
                        value,
                        value_len);
 }
+
+
+int kv_delete(kv_db *db,
+              const uint8_t *key,
+              uint32_t key_len)
+{
+    // Validate the inputs.
+    if (db == NULL || key == NULL) {
+        return -1;
+    }
+
+    // Create a DELETE record.
+    kv_record record = {0};
+
+    record.operation = KV_OP_DELETE;
+    record.key_len = key_len;
+    record.val_len = 0;
+    record.key = (uint8_t *)key;
+    record.value = NULL;
+
+    // Serialize the record.
+    size_t record_len = 0;
+
+    uint8_t *buffer = kv_record_serialize(&record, &record_len);
+
+    if (buffer == NULL) {
+        return -1;
+    }
+
+    // Persist the DELETE operation in the WAL.
+    int result = kv_wal_append(db->wal_fd, buffer, record_len);
+
+    free(buffer);
+
+    if (result != 0) {
+        return -1;
+    }
+
+    // Remove the key from the in-memory hash table.
+    result = kv_hash_delete(&db->table, key, key_len);
+
+    if (result != 0) {
+        return -1;
+    }
+
+    return 0;
+}
