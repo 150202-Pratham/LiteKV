@@ -5,6 +5,7 @@
 // Gives us definations related to sizes -> size_t = it is used to store sizes of memory buffers and files
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 /*
   Open a WAL File
@@ -51,6 +52,8 @@ void kv_wal_close(int fd) ;
 int kv_wal_read(int fd,
                 uint8_t **data,
                 size_t *len
-);
+            );
 
+
+int kv_wal_recover_tail(int fd, off_t valid_end);           
 #endif

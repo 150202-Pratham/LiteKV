@@ -39,19 +39,31 @@ kv_db *kv_open(const char *path)
         return NULL;
     }
 
-    // Replay WAL records into the in-memory hash table.
-    int result = kv_replay(read_fd, &db->table);
+    // Replay the WAL and track the last valid record boundary.
+off_t valid_end = 0;
 
-    // Close the temporary read-only file descriptor.
-    close(read_fd);
+int result = kv_replay(read_fd, &db->table, &valid_end);
 
-    // Handle replay failure.
-    if (result != 0) {
+// Close the read-only descriptor.
+close(read_fd);
+
+// Recover an incomplete final record.
+if (result == 1) {
+
+    if (kv_wal_recover_tail(db->wal_fd, valid_end) != 0) {
         kv_hash_free(&db->table);
         kv_wal_close(db->wal_fd);
         free(db);
         return NULL;
     }
+
+} else if (result != 0) {
+
+    kv_hash_free(&db->table);
+    kv_wal_close(db->wal_fd);
+    free(db);
+    return NULL;
+}
 
     // Return the successfully opened database.
     return db;

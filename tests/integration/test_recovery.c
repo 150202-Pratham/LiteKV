@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <string.h>
 
 int main(void)
 {
@@ -39,12 +42,20 @@ int main(void)
 
     // Reopening should fail with the current recovery implementation.
     db = kv_open(path);
+assert(db != NULL);
 
-    assert(db == NULL);
+uint8_t *read_value = NULL;
+uint32_t read_len = 0;
 
-    printf("INTEGRATION TEST 4 PASSED: incomplete WAL rejected\n");
+assert(kv_get(db, key, sizeof(key)-1, &read_value, &read_len) == 0);
+assert(read_len == sizeof(value) - 1);
+assert(memcmp(read_value, value, read_len) == 0);
 
-    unlink(path);
+free(read_value);
+
+assert(kv_close(db) == 0);
+
+printf("INTEGRATION TEST 4 PASSED: incomplete WAL recovered\n");
 
     return 0;
 }

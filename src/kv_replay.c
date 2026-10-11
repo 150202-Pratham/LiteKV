@@ -2,16 +2,25 @@
 
 #include "kv_wal.h"
 #include "kv_record.h"
-
+#include <unistd.h>
+#include<stdio.h>
 #include <stdlib.h>
 
-int kv_replay(int fd, kv_hash_table *table) {
+int kv_replay(int fd, kv_hash_table *table , off_t *valid_end) {
 
-    if (fd < 0 || table == NULL) {
+    if (fd < 0 || table == NULL || valid_end == NULL) {
         return -1;
     }
+    
+    *valid_end = 0 ;
 
     while (1) {
+
+        off_t record_start = lseek(fd, 0, SEEK_CUR);
+
+        if (record_start == (off_t)-1) {
+            return -1;
+        }
 
         /*
          * Read the next serialized record.
@@ -29,14 +38,30 @@ int kv_replay(int fd, kv_hash_table *table) {
          * End of WAL: replay completed.
          */
         if (result == 1) {
+            *valid_end = lseek(fd , 0 , SEEK_CUR) ;
+
+            if(*valid_end == (off_t)-1){
+
+
+                return -1 ;
+
+            }
             return 0;
         }
 
         /*
          * Reading failed or record is incomplete.
          */
-        if (result == -1) {
-            return -1;
+        if (result == -2) {
+
+            *valid_end = record_start ;
+
+            return 1;
+        }
+
+        if(result == -1){
+            return -1 ;
+            
         }
 
         /*
@@ -98,5 +123,11 @@ int kv_replay(int fd, kv_hash_table *table) {
         if (result != 0) {
             return -1;
         }
-    }
+
+        *valid_end =  lseek(fd,0,SEEK_CUR) ;
+        if(*valid_end == (off_t)-1 ){
+            return -1 ;
+
+        }
+    }  
 }

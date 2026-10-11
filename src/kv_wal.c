@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include "kv_wal.h"
 #include <stdio.h>
 /*
@@ -8,7 +10,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <sys/types.h>
 
 int kv_wal_open(const char *path){
 
@@ -115,7 +117,7 @@ int kv_wal_read(int fd,
                 header_bytes
             );
 
-            return -1 ;
+            return -2 ;
 
         }
 
@@ -206,7 +208,7 @@ int kv_wal_read(int fd,
             );
 
             free(buffer);
-            return -1;
+            return -2;
         }
         if(n<0){
             free(buffer) ;
@@ -224,7 +226,6 @@ int kv_wal_read(int fd,
     return 0;
 }
 
-
 void kv_wal_close(int fd){
 
     if(fd >=0 ){
@@ -232,4 +233,26 @@ void kv_wal_close(int fd){
         close(fd) ;
 
     }
+}
+
+int kv_wal_recover_tail(int fd, off_t valid_end)
+{
+    // Step 1: Validate the arguments.
+    if (fd < 0 || valid_end < 0) {
+        return -1;
+    }
+
+    // Step 2: Truncate the WAL at the last valid record boundary.
+    if (ftruncate(fd, valid_end) == -1) {
+        perror("WAL ERROR: Truncating incomplete tail");
+        return -1;
+    }
+
+    // Step 3: Ensure the truncation is persisted.
+    if (fsync(fd) == -1) {
+        perror("WAL ERROR: Syncing recovered WAL");
+        return -1;
+    }
+
+    return 0;
 }
