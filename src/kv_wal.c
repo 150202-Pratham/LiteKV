@@ -1,4 +1,5 @@
 #include "kv_wal.h"
+#include <stdio.h>
 /*
   This Gives us functions related to opening Files
   like open() and also provide flags such as O_WRONLY ,O_CREAT, O_APPEND
@@ -89,35 +90,86 @@ int kv_wal_read(int fd,
         return -1;
     }
 
-    uint8_t header[8];
+    *data = NULL ;
+    *len = 0 ;
+    uint8_t header[12];
+    size_t  header_bytes = 0 ;
 
-    ssize_t n =
-        read(fd, header, 8);
+    while(header_bytes < sizeof(header) ){
+        ssize_t n = read(
+            fd ,
+            header + header_bytes,
+            sizeof(header) - header_bytes
+        );
+        
+        if(n==0){
 
-    if (n == 0) {
-        return 1;
-    }
+            if(header_bytes == 0 ){
+                return 1 ;
 
-    if (n != 8) {
-        return -1;
-    }
+            }
 
+            fprintf(
+                stderr,
+                "WAL ERROR: Incomplete header (%zu of 12 bytes)\n",
+                header_bytes
+            );
+
+            return -1 ;
+
+        }
+
+        if( n<0 ){
+            perror("WAL ERROR: Reading header");
+            return -1; 
+        }
+        header_bytes += (size_t)n ;
+
+    } 
+   
+    uint32_t operation ;
     uint32_t key_len;
     uint32_t val_len;
 
     memcpy(
-        &key_len,
+        &operation,
         header,
+        4
+    );
+    memcpy(
+        &key_len,
+        header+4,
         4
     );
 
     memcpy(
         &val_len,
-        header + 4,
+        header + 8,
         4
     );
+    
+    // if(operation!=1 && operation!=2){
+    //     return -1 ;
+    // }
+    
+    fprintf(stderr, "DEBUG: operation=%u, key_len=%u, val_len=%u\n",
+        operation, key_len, val_len);
 
-    size_t body_len = 4 + 4 + key_len + val_len;
+    if (operation != 1 && operation != 2) {
+        fprintf(stderr, "DEBUG: Invalid operation\n");
+        return -1;
+    }
+
+
+    if(operation == 2 && val_len != 0){
+         fprintf(
+            stderr,
+            "WAL ERROR: DELETE record has a nonzero value length\n"
+        );
+        return -1 ;
+
+    }
+    size_t body_len = 12+ (size_t)key_len + (size_t)val_len;
 
     size_t total_len = body_len + 4;
 
@@ -128,25 +180,42 @@ int kv_wal_read(int fd,
     }
 
     memcpy(
-        buffer
+        buffer,
         header,
-        8
+        sizeof(header)
     );
 
     size_t remaining =
-        total_len - 8;
+        total_len - sizeof(header);
+    size_t bytes_read = 0 ;
 
-    uint8_t *p =
-        buffer + 8;
+    while(bytes_read < remaining ){
+        ssize_t n = read(
+            fd ,
+            buffer + sizeof(header) + bytes_read,
+            remaining - bytes_read
+        );
+        
+        if (n == 0) {
+            fprintf(
+                stderr,
+                "WAL ERROR: Incomplete record body "
+                "(%zu of %zu bytes read)\n",
+                bytes_read,
+                remaining
+            );
 
-    ssize_t bytes_read =
-        read(fd, p, remaining);
+            free(buffer);
+            return -1;
+        }
+        if(n<0){
+            free(buffer) ;
+            return -1 ;
 
-    if (bytes_read != (ssize_t)remaining) {
+        }
 
-        free(buffer);
+        bytes_read += (size_t)n ;
 
-        return -1;
     }
 
     *data = buffer;
