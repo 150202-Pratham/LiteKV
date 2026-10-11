@@ -18,7 +18,7 @@ int main(void) {
      * Create a test record.
      */
     kv_record record;
-
+    record.operation = KV_OP_PUT;
     record.key_len = 5;
     record.val_len = 5;
 
@@ -94,6 +94,8 @@ int main(void) {
             &len
         );
 
+    printf("DEBUG: kv_wal_read returned %d\n", result);
+    printf("DEBUG: len = %zu\n", len);
     assert(result == 0);
 
     printf(
