@@ -21,5 +21,9 @@ int kv_put(kv_db *db,
            const uint8_t *value,
            uint32_t value_len);
 
-
+int kv_get(kv_db *db,
+           const uint8_t *key,
+           uint32_t key_len,
+           uint8_t **value,
+           uint32_t *value_len);
 #endif

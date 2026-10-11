@@ -82,12 +82,12 @@ int kv_put(kv_db *db,
            const uint8_t *value,
            uint32_t value_len)
 {
-    // Step 1: Validate the inputs.
+    // Validate the inputs.
     if (db == NULL || key == NULL || value == NULL) {
         return -1;
     }
 
-    // Step 2: Create a PUT record.
+    // Create a PUT record.
     kv_record record = {0};
 
     record.operation = KV_OP_PUT;
@@ -96,7 +96,7 @@ int kv_put(kv_db *db,
     record.key = (uint8_t *)key;
     record.value = (uint8_t *)value;
 
-    // Step 3: Serialize the record into bytes.
+    // Serialize the record into bytes.
     size_t record_len = 0;
 
     uint8_t *buffer = kv_record_serialize(&record, &record_len);
@@ -105,7 +105,7 @@ int kv_put(kv_db *db,
         return -1;
     }
 
-    // Step 4: Append the serialized record to the WAL.
+    // Append the serialized record to the WAL.
     int result = kv_wal_append(db->wal_fd, buffer, record_len);
 
     // The serialized buffer is no longer needed.
@@ -115,7 +115,7 @@ int kv_put(kv_db *db,
         return -1;
     }
 
-    // Step 5: Update the in-memory hash table.
+    // Update the in-memory hash table.
     result = kv_hash_put(&db->table,
                          key,
                          key_len,
@@ -126,6 +126,33 @@ int kv_put(kv_db *db,
         return -1;
     }
 
-    // Step 6: Report success.
+    // Report success.
     return 0;
+}
+
+
+int kv_get(kv_db *db,
+           const uint8_t *key,
+           uint32_t key_len,
+           uint8_t **value,
+           uint32_t *value_len)
+{
+    // Validate the inputs.
+    if (db == NULL ||
+        key == NULL ||
+        value == NULL ||
+        value_len == NULL) {
+        return -1;
+    }
+
+    // Initialize the output parameters.
+    *value = NULL;
+    *value_len = 0;
+
+    // Search the in-memory hash table.
+    return kv_hash_get(&db->table,
+                       key,
+                       key_len,
+                       value,
+                       value_len);
 }
