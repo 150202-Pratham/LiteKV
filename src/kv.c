@@ -1,7 +1,9 @@
 #include "kv.h"
 #include "kv_wal.h"
 #include "kv_replay.h"
+#include "kv_record.h"
 
+#include <stdint.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -71,5 +73,59 @@ int kv_close(kv_db *db)
     // Step 4: Release the database object itself.
     free(db);
 
+    return 0;
+}
+
+int kv_put(kv_db *db,
+           const uint8_t *key,
+           uint32_t key_len,
+           const uint8_t *value,
+           uint32_t value_len)
+{
+    // Step 1: Validate the inputs.
+    if (db == NULL || key == NULL || value == NULL) {
+        return -1;
+    }
+
+    // Step 2: Create a PUT record.
+    kv_record record = {0};
+
+    record.operation = KV_OP_PUT;
+    record.key_len = key_len;
+    record.val_len = value_len;
+    record.key = (uint8_t *)key;
+    record.value = (uint8_t *)value;
+
+    // Step 3: Serialize the record into bytes.
+    size_t record_len = 0;
+
+    uint8_t *buffer = kv_record_serialize(&record, &record_len);
+
+    if (buffer == NULL) {
+        return -1;
+    }
+
+    // Step 4: Append the serialized record to the WAL.
+    int result = kv_wal_append(db->wal_fd, buffer, record_len);
+
+    // The serialized buffer is no longer needed.
+    free(buffer);
+
+    if (result != 0) {
+        return -1;
+    }
+
+    // Step 5: Update the in-memory hash table.
+    result = kv_hash_put(&db->table,
+                         key,
+                         key_len,
+                         value,
+                         value_len);
+
+    if (result != 0) {
+        return -1;
+    }
+
+    // Step 6: Report success.
     return 0;
 }
