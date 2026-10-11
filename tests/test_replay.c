@@ -28,7 +28,7 @@ int main(void) {
      * Create first record.
      */
     kv_record record1;
-
+    record1.operation = KV_OP_PUT ;
     record1.key_len = 4;
     record1.val_len = 7;
 
@@ -72,7 +72,7 @@ int main(void) {
      * Create second record.
      */
     kv_record record2;
-
+    record2.operation = KV_OP_PUT;
     record2.key_len = 3;
     record2.val_len = 2;
 
